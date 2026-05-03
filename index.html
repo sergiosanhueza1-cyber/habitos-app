@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mis Hábitos</title>
+  <meta name="theme-color" content="#08080f"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Hábitos"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#08080f;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;min-height:100vh}
+    #root{max-width:430px;margin:0 auto;padding:24px 16px 0}
+    button{font-family:inherit}
+    input,textarea{font-family:inherit}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const SB_URL = "https://vrljcsslrobbrcpuhkik.supabase.co/rest/v1";
+const SB_KEY = "sb_publishable_zwEQptq2NWqGEXwrQ4ppyQ_V6VA5GM8";
+const H = {"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json"};
+
+const sbGet = async(p)=>{try{const r=await fetch(`${SB_URL}/${p}`,{headers:H});return r.ok?r.json():[]}catch{return[]}};
+const sbPost = async(p,b)=>{try{const r=await fetch(`${SB_URL}/${p}`,{method:"POST",headers:{...H,"Prefer":"return=minimal"},body:JSON.stringify(b)});return r.ok}catch{return false}};
+const sbPatch = async(p,b)=>{try{const r=await fetch(`${SB_URL}/${p}`,{method:"PATCH",headers:{...H,"Prefer":"return=minimal"},body:JSON.stringify(b)});return r.ok}catch{return false}};
+
+const HABITS_BASE=[
+  {id:'flexiones',name:'💪 Mini rutina flexiones',section:'morning',type:'check',category:'fisico',days:'daily'},
+  {id:'ducha_fria',name:'🧊 Ducha fría 30 seg',section:'morning',type:'weekly_target',category:'salud',days:'daily',target:6},
+  {id:'hidratacion',name:'💧 Hidratación 2L',section:'day',type:'check',category:'salud',days:'daily'},
+  {id:'calorias',name:'🍽️ Calorías < 2.000',section:'day',type:'check',category:'salud',days:'daily'},
+  {id:'proteina',name:'🥤 Proteína',section:'day',type:'weekly_target',category:'salud',days:'daily',target:5},
+  {id:'suplementos',name:'💊 Suplementos',section:'day',type:'collapsible',category:'salud',days:'daily',
+    children:[{id:'sup_creatina',name:'Creatina'},{id:'sup_b',name:'Complejo B'},{id:'sup_omega',name:'Omega-3'},{id:'sup_d3',name:'D3+K2'},{id:'sup_mag',name:'Magnesio noche'}]},
+  {id:'ejercicio',name:'🏋️ Ejercicio en casa',section:'evening',type:'weekly_target',category:'fisico',days:'daily',target:2},
+  {id:'meditacion',name:'🧘 Meditación 15 min',section:'evening',type:'weekly_target',category:'mental',days:'daily',target:3},
+  {id:'no_porno',name:'🚫 No porno',section:'evening',type:'abstinence',category:'mental',days:'daily'},
+  {id:'no_masturb',name:'✋ No masturbación',section:'evening',type:'abstinence',category:'mental',days:'daily'},
+  {id:'dormir',name:'😴 Dormir 7-8 hrs',section:'sleep',type:'collapsible',category:'salud',days:'daily',
+    children:[{id:'dor_acostar',name:'🌙 Acostarse 23:00'},{id:'dor_levantar',name:'☀️ Levantarse 7:00'}]},
+  {id:'gratitud',name:'🙏 Gratitud nocturna',section:'sleep',type:'check',category:'mental',days:'daily'},
+  {id:'respiracion',name:'🌬️ Respiración 4-4-4',section:'sleep',type:'check',category:'mental',days:'daily'},
+  {id:'estudio_lv',name:'📚 Estudio USS 30 min',section:'sleep',type:'check',category:'estudio',days:'weekday'},
+  {id:'pausa',name:'☕ Pausa 15 min ~11:30',section:'day',type:'check',category:'salud',days:'weekday'},
+  {id:'planificar',name:'📓 Planificar día siguiente',section:'sleep',type:'check',category:'estudio',days:'weekday'},
+  {id:'estudio_fds',name:'📚 Estudio USS 1 hora',section:'morning',type:'check',category:'estudio',days:'weekend'},
+  {id:'futbol',name:'⚽ Fútbol Los Prados',section:'morning',type:'check',category:'social',days:'weekend'},
+  {id:'hacer_cama',name:'🛏️ Hacer la cama',section:'morning',type:'check',category:'salud',days:'weekend'},
+  {id:'leer',name:'📖 Leer 15 min',section:'evening',type:'check',category:'mental',days:'weekend'},
+  {id:'pesarse',name:'⚖️ Pesarme y registrar',section:'extra',type:'weight',category:'salud',days:'weekly'},
+  {id:'contacto',name:'📞 Llamar / escribir a alguien',section:'extra',type:'check',category:'social',days:'weekly'},
+  {id:'trekking',name:'🏔️ Trekking / outdoor',section:'extra',type:'check',category:'fisico',days:'monthly'},
+  {id:'salida',name:'🎉 Salida con amigos',section:'extra',type:'check',category:'social',days:'monthly'},
+];
+
+const SECTIONS={morning:'🌅 Mañana',day:'☀️ Día',evening:'🌆 Tarde / Noche',sleep:'🌙 Antes de Dormir',extra:'📅 Semanal / Mensual'};
+const C={salud:'#00e5b0',fisico:'#4ade80',mental:'#a78bfa',estudio:'#60a5fa',social:'#f472b6',bg:'#08080f',card:'rgba(255,255,255,0.04)',border:'rgba(255,255,255,0.08)'};
+const sem=p=>p>=75?'#4ade80':p>=40?'#facc15':'#f87171';
+const todayStr=()=>new Date().toISOString().split('T')[0];
+const getDayType=()=>{const d=new Date().getDay();return d===0||d===6?'weekend':'weekday'};
+const getWeekStart=()=>{const d=new Date(),day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);mon.setDate(d.getDate()+diff);return mon.toISOString().split('T')[0]};
+const getWeekEnd=()=>{const ws=new Date(getWeekStart());ws.setDate(ws.getDate()+6);return ws.toISOString().split('T')[0]};
+const isApplicable=h=>{if(h.days==='daily')return true;if(h.days==='weekday')return getDayType()==='weekday';if(h.days==='weekend')return getDayType()==='weekend';return true};
+
+function App(){
+  const[tab,setTab]=useState('today');
+  const[weekLogs,setWeekLogs]=useState({});
+  const[weightLog,setWeightLog]=useState([]);
+  const[notes,setNotes]=useState({});
+  const[loading,setLoading]=useState(true);
+  const[saving,setSaving]=useState(false);
+  const[dbError,setDbError]=useState(false);
+  const[expanded,setExpanded]=useState({});
+  const[weightModal,setWeightModal]=useState(false);
+  const[weightInput,setWeightInput]=useState('');
+  const[noteModal,setNoteModal]=useState(false);
+
+  const TODAY=todayStr(),WEEK_START=getWeekStart(),WEEK_END=getWeekEnd();
+  const todayLogs=weekLogs[TODAY]||{};
+
+  useEffect(()=>{init()},[]);
+
+  const init=async()=>{
+    setLoading(true);setDbError(false);
+    try{await seedHabits();await loadWeekData();}catch{setDbError(true);}
+    setLoading(false);
+  };
+
+  const seedHabits=async()=>{
+    const ex=await sbGet("habits?select=id&limit=1");
+    if(Array.isArray(ex)&&ex.length===0){
+      const rows=HABITS_BASE.map(h=>({id:h.id,name:h.name,section:h.section,type:h.type,category:h.category,days:h.days,target:h.target||null,active:true}));
+      await sbPost("habits",rows);
+    }
+  };
+
+  const loadWeekData=async()=>{
+    const ld=await sbGet(`logs?date=gte.${WEEK_START}&date=lte.${WEEK_END}`);
+    const map={};
+    if(Array.isArray(ld)){ld.forEach(r=>{if(!map[r.date])map[r.date]={};map[r.date][r.habit_id]=r.done});}
+    setWeekLogs(map);
+    const wd=await sbGet("weight_log?order=date.asc&limit=20");
+    if(Array.isArray(wd))setWeightLog(wd);
+    const nd=await sbGet(`notes?date=eq.${TODAY}`);
+    if(Array.isArray(nd)&&nd.length>0)setNotes({[TODAY]:nd[0].text});
+  };
+
+  const toggle=async(hId)=>{
+    const prev=todayLogs[hId]??false,next=!prev;
+    setWeekLogs(p=>({...p,[TODAY]:{...(p[TODAY]||{}),[hId]:next}}));
+    setSaving(true);
+    const ex=await sbGet(`logs?habit_id=eq.${hId}&date=eq.${TODAY}`);
+    const ok=Array.isArray(ex)&&ex.length>0
+      ?await sbPatch(`logs?habit_id=eq.${hId}&date=eq.${TODAY}`,{done:next})
+      :await sbPost("logs",{habit_id:hId,date:TODAY,done:next});
+    if(!ok)setWeekLogs(p=>({...p,[TODAY]:{...(p[TODAY]||{}),[hId]:prev}}));
+    setSaving(false);
+  };
+
+  const usePermission=async(hId)=>{
+    const pId=`${hId}_perm`;
+    setWeekLogs(p=>({...p,[WEEK_START]:{...(p[WEEK_START]||{}),[pId]:true}}));
+    setSaving(true);
+    const ex=await sbGet(`logs?habit_id=eq.${pId}&date=eq.${WEEK_START}`);
+    Array.isArray(ex)&&ex.length>0
+      ?await sbPatch(`logs?habit_id=eq.${pId}&date=eq.${WEEK_START}`,{done:true})
+      :await sbPost("logs",{habit_id:pId,date:WEEK_START,done:true});
+    setSaving(false);
+  };
+  const hasPerm=hId=>weekLogs[WEEK_START]?.[`${hId}_perm`]===true;
+
+  const getWeekCount=hId=>{
+    let n=0;const ws=new Date(WEEK_START);
+    for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(ws.getDate()+i);if(weekLogs[d.toISOString().split('T')[0]]?.[hId])n++;}
+    return n;
+  };
+
+  const childStatus=h=>{if(!h.children)return{done:0,total:0};return{done:h.children.filter(c=>todayLogs[c.id]).length,total:h.children.length}};
+
+  const saveWeight=async()=>{
+    const val=parseFloat(weightInput);if(isNaN(val)||val<=0)return;
+    setSaving(true);
+    setWeightLog(p=>[...p.filter(w=>w.date!==TODAY),{date:TODAY,value:val}].sort((a,b)=>a.date.localeCompare(b.date)));
+    const ex=await sbGet(`weight_log?date=eq.${TODAY}`);
+    Array.isArray(ex)&&ex.length>0?await sbPatch(`weight_log?date=eq.${TODAY}`,{value:val}):await sbPost("weight_log",{date:TODAY,value:val});
+    setSaving(false);setWeightModal(false);setWeightInput('');
+  };
+
+  const persistNote=async()=>{
+    const text=notes[TODAY]||'';setSaving(true);
+    const ex=await sbGet(`notes?date=eq.${TODAY}`);
+    Array.isArray(ex)&&ex.length>0?await sbPatch(`notes?date=eq.${TODAY}`,{text}):await sbPost("notes",{date:TODAY,text});
+    setSaving(false);setNoteModal(false);
+  };
+
+  const applicable=HABITS_BASE.filter(isApplicable);
+  const isDone=h=>{
+    if(h.type==='check')return!!todayLogs[h.id];
+    if(h.type==='weekly_target')return!!todayLogs[h.id];
+    if(h.type==='collapsible'){const{done,total}=childStatus(h);return done===total&&total>0;}
+    if(h.type==='abstinence')return!!todayLogs[h.id]||hasPerm(h.id);
+    if(h.type==='weight')return weightLog.some(w=>w.date>=WEEK_START);
+    return false;
+  };
+  const doneCount=applicable.filter(isDone).length;
+  const pctToday=applicable.length>0?Math.round((doneCount/applicable.length)*100):0;
+
+  const dotS=(active,color)=>({width:22,height:22,borderRadius:'50%',flexShrink:0,background:active?color:'transparent',border:`2px solid ${active?color:'#3a3a4a'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11});
+  const cardS=(done,cc)=>({display:'flex',alignItems:'center',gap:12,padding:'13px 14px',borderRadius:12,marginBottom:8,background:done?'rgba(74,222,128,0.06)':C.card,border:`1px solid ${done?'rgba(74,222,128,0.22)':C.border}`,borderLeft:`3px solid ${cc}`,cursor:'pointer',transition:'all 0.15s'});
+
+  const renderHabit=h=>{
+    const cc=C[h.category]||'#888',done=isDone(h);
+    if(h.type==='check')return(
+      <div key={h.id} onClick={()=>toggle(h.id)} style={cardS(done,cc)}>
+        <div style={dotS(done,cc)}>{done?'✓':''}</div>
+        <span style={{color:done?'#666':'#ddd',fontSize:14,flex:1,textDecoration:done?'line-through':'none'}}>{h.name}</span>
+        {h.days!=='daily'&&<span style={{fontSize:10,color:'#444',background:'rgba(255,255,255,0.04)',padding:'2px 7px',borderRadius:10}}>{h.days==='weekly'?'semanal':'mensual'}</span>}
+      </div>
+    );
+    if(h.type==='weekly_target'){
+      const count=getWeekCount(h.id),ratio=count/h.target,mc=ratio>=1?'#4ade80':ratio>=0.5?'#facc15':'#666',mk=!!todayLogs[h.id];
+      return(<div key={h.id} onClick={()=>toggle(h.id)} style={cardS(mk,cc)}>
+        <div style={dotS(mk,cc)}>{mk?'✓':''}</div>
+        <span style={{color:mk?'#666':'#ddd',fontSize:14,flex:1}}>{h.name}</span>
+        <span style={{fontSize:12,fontWeight:700,color:mc,background:`${mc}18`,padding:'3px 9px',borderRadius:20}}>{count}/{h.target}/sem</span>
+      </div>);
+    }
+    if(h.type==='collapsible'){
+      const open=!!expanded[h.id],{done:cd,total:ct}=childStatus(h),allD=cd===ct&&ct>0,someD=cd>0&&!allD,dc=allD?'#4ade80':someD?'#facc15':'#3a3a4a';
+      return(<div key={h.id} style={{marginBottom:8}}>
+        <div onClick={()=>setExpanded(p=>({...p,[h.id]:!p[h.id]}))} style={{...cardS(allD,cc),marginBottom:0,borderRadius:open?'12px 12px 0 0':12}}>
+          <div style={{...dotS(allD,cc),border:`2px solid ${dc}`}}>{allD?'✓':''}</div>
+          <span style={{color:'#ddd',fontSize:14,flex:1}}>{h.name}</span>
+          <span style={{fontSize:12,color:dc,background:`${dc}20`,padding:'2px 8px',borderRadius:20}}>{cd}/{ct}</span>
+          <span style={{color:'#444',fontSize:13,marginLeft:4}}>{open?'▲':'▼'}</span>
+        </div>
+        {open&&<div style={{background:'rgba(255,255,255,0.015)',borderRadius:'0 0 12px 12px',border:`1px solid ${C.border}`,borderTop:'none',padding:'6px 10px 8px'}}>
+          {h.children.map(child=>{const cv=!!todayLogs[child.id];return(
+            <div key={child.id} onClick={()=>toggle(child.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 8px',cursor:'pointer'}}>
+              <div style={{width:17,height:17,borderRadius:'50%',flexShrink:0,background:cv?cc:'transparent',border:`2px solid ${cv?cc:'#3a3a4a'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9}}>{cv?'✓':''}</div>
+              <span style={{color:cv?'#555':'#bbb',fontSize:13,textDecoration:cv?'line-through':'none'}}>{child.name}</span>
+            </div>
+          );})}
+        </div>}
+      </div>);
+    }
+    if(h.type==='abstinence'){
+      const pu=hasPerm(h.id),cf=!!todayLogs[h.id];
+      return(<div key={h.id} style={{...cardS(cf,cc),cursor:'default'}}>
+        <div onClick={()=>toggle(h.id)} style={{...dotS(cf,cc),cursor:'pointer'}}>{cf?'✓':''}</div>
+        <span onClick={()=>toggle(h.id)} style={{color:cf?'#666':'#ddd',fontSize:14,flex:1,cursor:'pointer'}}>{h.name}</span>
+        {pu?<span style={{fontSize:11,color:'#fb923c',background:'rgba(251,146,60,0.12)',padding:'3px 9px',borderRadius:20}}>Permiso ✓</span>
+           :!cf&&<button onClick={()=>usePermission(h.id)} style={{fontSize:11,color:'#fb923c',background:'rgba(251,146,60,0.08)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:20,padding:'4px 11px',cursor:'pointer'}}>Permiso</button>}
+      </div>);
+    }
+    if(h.type==='weight'){
+      const lw=weightLog.length>0?weightLog[weightLog.length-1]:null,dw=weightLog.some(w=>w.date>=WEEK_START);
+      return(<div key={h.id} onClick={()=>setWeightModal(true)} style={cardS(dw,cc)}>
+        <div style={dotS(dw,cc)}>{dw?'✓':''}</div>
+        <span style={{color:'#ddd',fontSize:14,flex:1}}>{h.name}</span>
+        {lw&&<span style={{fontSize:14,fontWeight:700,color:cc}}>{lw.value} kg</span>}
+      </div>);
+    }
+    return null;
+  };
+
+  const dateLabel=new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+  const dateStr=dateLabel.charAt(0).toUpperCase()+dateLabel.slice(1);
+  const secOrder=['morning','day','evening','sleep','extra'];
+
+  if(loading)return(
+    <div style={{background:C.bg,minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+      <div style={{fontSize:48,marginBottom:16}}>☁️</div>
+      <div style={{color:'#00e5b0',fontSize:16,fontWeight:700}}>Conectando a Supabase...</div>
+      <div style={{color:'#444',fontSize:12,marginTop:8}}>Cargando tus hábitos</div>
+    </div>
+  );
+
+  if(dbError)return(
+    <div style={{background:C.bg,minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24,textAlign:'center'}}>
+      <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
+      <div style={{color:'#f87171',fontSize:16,fontWeight:700,marginBottom:8}}>Error de conexión</div>
+      <button onClick={init} style={{padding:'14px 28px',borderRadius:14,background:'#00e5b0',border:'none',color:'#08080f',fontWeight:800,fontSize:15,cursor:'pointer'}}>Reintentar</button>
+    </div>
+  );
+
+  return(
+    <div style={{background:C.bg,minHeight:'100vh',color:'#fff',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif',maxWidth:430,margin:'0 auto',padding:'24px 16px 0'}}>
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:12,color:'#3a3a4a',marginBottom:4}}>{dateStr}</div>
+        <h1 style={{fontSize:26,fontWeight:900,margin:0,background:'linear-gradient(90deg,#00e5b0,#60a5fa)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Mis Hábitos</h1>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:'#00e5b0'}}/>
+          <span style={{fontSize:11,color:'#2a6a4a'}}>Conectado a Supabase ☁️{saving?' · Guardando...':''}</span>
+        </div>
+      </div>
+
+      {tab==='today'&&(
+        <div style={{paddingBottom:100}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:24}}>
+            {[{label:'Hoy',value:`${pctToday}%`,color:sem(pctToday),action:null},{label:'Hábitos',value:`${doneCount}/${applicable.length}`,color:'#60a5fa',action:null},{label:'Nota',value:notes[TODAY]?'✏️':'＋',color:'#a78bfa',action:()=>setNoteModal(true)}].map((s,i)=>(
+              <div key={i} onClick={s.action} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'14px 8px',textAlign:'center',cursor:s.action?'pointer':'default'}}>
+                <div style={{fontSize:20,fontWeight:800,color:s.color}}>{s.value}</div>
+                <div style={{fontSize:11,color:'#555',marginTop:2}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {secOrder.map(sec=>{
+            const hs=applicable.filter(h=>h.section===sec);
+            if(!hs.length)return null;
+            return(<div key={sec} style={{marginBottom:28}}>
+              <div style={{fontSize:11,fontWeight:700,color:'#444',letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>{SECTIONS[sec]}</div>
+              {hs.map(renderHabit)}
+            </div>);
+          })}
+        </div>
+      )}
+
+      {tab==='stats'&&(
+        <div style={{paddingBottom:100}}>
+          <h2 style={{color:'#eee',fontSize:18,fontWeight:800,marginBottom:20}}>Estadísticas</h2>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:20,marginBottom:16}}>
+            <div style={{fontSize:11,color:'#555',textTransform:'uppercase',letterSpacing:1,marginBottom:16}}>Últimos 7 días</div>
+            <div style={{display:'flex',alignItems:'flex-end',gap:6,height:90}}>
+              {Array.from({length:7},(_,i)=>{
+                const d=new Date();d.setDate(d.getDate()-(6-i));
+                const key=d.toISOString().split('T')[0],dt=d.getDay()===0||d.getDay()===6?'weekend':'weekday';
+                const app=HABITS_BASE.filter(h=>h.days==='daily'||(h.days==='weekday'&&dt==='weekday')||(h.days==='weekend'&&dt==='weekend')||h.days==='weekly'||h.days==='monthly');
+                const dn=app.filter(h=>weekLogs[key]?.[h.id]).length,pct=app.length>0?Math.round((dn/app.length)*100):0;
+                const color=sem(pct),isT=key===TODAY;
+                return(<div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4,height:'100%',justifyContent:'flex-end'}}>
+                  <span style={{fontSize:9,color,fontWeight:700}}>{pct>0?`${pct}%`:''}</span>
+                  <div style={{width:'100%',borderRadius:'5px 5px 0 0',height:`${Math.max(pct,3)}%`,minHeight:3,background:`linear-gradient(180deg,${color}90,${color}30)`,outline:isT?`2px solid ${color}`:'none'}}/>
+                  <span style={{fontSize:11,color:isT?'#eee':'#555',fontWeight:isT?700:400}}>{['D','L','M','X','J','V','S'][d.getDay()]}</span>
+                </div>);
+              })}
+            </div>
+          </div>
+          {weightLog.length>0&&(
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:20}}>
+              <div style={{fontSize:11,color:'#555',textTransform:'uppercase',letterSpacing:1,marginBottom:14}}>⚖️ Peso</div>
+              {weightLog.slice(-5).reverse().map((w,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:`1px solid ${C.border}`,color:'#aaa',fontSize:13}}>
+                  <span>{w.date}</span><span style={{color:C.salud,fontWeight:700}}>{w.value} kg</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab==='gestion'&&(
+        <div style={{paddingBottom:100}}>
+          <h2 style={{color:'#eee',fontSize:18,fontWeight:800,marginBottom:12}}>Gestión</h2>
+          <div style={{background:'#00e5b015',border:'1px solid #00e5b030',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{color:'#00e5b0',fontWeight:700,marginBottom:4}}>✅ App conectada a Supabase</div>
+            <div style={{color:'#666',fontSize:12,lineHeight:1.6}}>Etapa 5: Instalar como PWA en iPhone<br/>Etapa 6: Login individual para amigos</div>
+          </div>
+        </div>
+      )}
+
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,zIndex:50,background:'rgba(8,8,15,0.96)',borderTop:`1px solid ${C.border}`,display:'flex',backdropFilter:'blur(24px)'}}>
+        {[{id:'today',icon:'🏠',label:'Hoy'},{id:'stats',icon:'📊',label:'Stats'},{id:'gestion',icon:'⚙️',label:'Gestión'}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:'13px 0 17px',background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+            <span style={{fontSize:19}}>{t.icon}</span>
+            <span style={{fontSize:11,fontWeight:tab===t.id?700:400,color:tab===t.id?'#00e5b0':'#444'}}>{t.label}</span>
+            {tab===t.id&&<div style={{width:4,height:4,borderRadius:'50%',background:'#00e5b0'}}/>}
+          </button>
+        ))}
+      </div>
+
+      {weightModal&&(
+        <div onClick={()=>setWeightModal(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:100}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#0f0f1c',borderRadius:'24px 24px 0 0',padding:'28px 24px 40px',width:'100%',maxWidth:430}}>
+            <h3 style={{color:'#eee',textAlign:'center',margin:'0 0 16px',fontSize:18}}>⚖️ Registrar peso</h3>
+            <input type="number" placeholder="75.5" value={weightInput} onChange={e=>setWeightInput(e.target.value)}
+              style={{width:'100%',background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:18,fontSize:32,color:'#eee',textAlign:'center',outline:'none',boxSizing:'border-box',marginBottom:16}}/>
+            <button onClick={saveWeight} style={{width:'100%',padding:16,borderRadius:14,border:'none',background:'linear-gradient(90deg,#00e5b0,#60a5fa)',color:'#08080f',fontWeight:800,fontSize:16,cursor:'pointer'}}>Guardar ☁️</button>
+          </div>
+        </div>
+      )}
+
+      {noteModal&&(
+        <div onClick={()=>setNoteModal(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:100}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#0f0f1c',borderRadius:'24px 24px 0 0',padding:'28px 24px 40px',width:'100%',maxWidth:430}}>
+            <h3 style={{color:'#eee',textAlign:'center',margin:'0 0 16px',fontSize:18}}>✏️ Nota del día</h3>
+            <textarea value={notes[TODAY]||''} placeholder="¿Cómo fue tu día?" onChange={e=>setNotes(p=>({...p,[TODAY]:e.target.value}))}
+              style={{width:'100%',background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16,fontSize:15,color:'#eee',outline:'none',boxSizing:'border-box',minHeight:130,resize:'none',marginBottom:16,fontFamily:'inherit'}}/>
+            <button onClick={persistNote} style={{width:'100%',padding:16,borderRadius:14,border:'none',background:'linear-gradient(90deg,#a78bfa,#60a5fa)',color:'#fff',fontWeight:800,fontSize:16,cursor:'pointer'}}>Guardar ☁️</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
